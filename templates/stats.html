@@ -1,0 +1,235 @@
+<!doctype html>
+<head>
+    <meta name='viewport' content='width=800, user-scalable=yes, initial-scale=1.0' />
+    <script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script src="//code.jquery.com/jquery-1.12.0.min.js"></script>
+    <style type="text/css">
+        html {
+            background: #00a9ff;
+            background: -moz-linear-gradient(45deg,  #00a9ff 0%, #ea00a8 100%);
+            background: -webkit-linear-gradient(45deg,  #00a9ff 0%,#ea00a8 100%);
+            background: linear-gradient(45deg,  #00a9ff 0%,#ea00a8 100%);
+
+            color: white;
+            min-height: 100%;
+            margin: 0;
+        }
+        body {
+            margin: 0;
+            font-family: 'HelveticaNeue-Light', Helvetica, Arial;
+            font-weight: lighter;
+            font-size: 20pt;
+            overflow-x: hidden;
+        }
+        path {
+            stroke: white;
+            stroke-width: 2px;
+            fill: none;
+            
+        }
+        line {
+            stroke: white;
+        }
+        text {
+            fill: white;
+            font-family: 'HelveticaNeue-Light', Helvetica, Arial;
+        }
+        
+        g.axis {
+            font-size: 10pt;
+        }
+        
+        #options {
+            width: 100%;
+            background-color: rgba(0,0,0,0.1);
+            padding: 1em;
+        }
+        .button {
+            border: 1px solid white;
+            border-radius: 0.25em;
+            padding: 0.1em;
+            padding-left: 0.5em;
+            padding-right: 0.5em;
+            display: inline-block;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+        }
+        
+        input[type="number"] {
+            font-size: 20pt;
+            width: 3em;
+        }
+        
+        
+        
+        #userstats .number {
+            font-weight: bolder;
+        }
+        
+    </style>
+    <script type="text/javascript">
+        var chart_width = 800;
+        var chart_height = 600;
+        var chart_margin = 50;
+        var auto_update = false;
+        var UPDATE_INTERVAL = 30000;
+        var past_hrs = 8;
+        var resolution = 200;
+        
+        $(document).ready(function() {
+            show_past_hours(8); 
+            
+            $("#show1hr").click(function() { auto_update = true; show_past_hours(1); })
+            $("#show8hrs").click(function() { auto_update = false; show_past_hours(8); })
+            $("#show24").click(function() { auto_update = false;show_past_hours(24); })
+            $("#show3days").click(function() { auto_update = false;show_past_hours(24*3); })
+            $("#showWeek").click(function() { auto_update = false;show_past_week(); })
+            $("#showMonth").click(function() { auto_update = false;show_past_month(); })
+            
+            window.setInterval(update_user_stats, 5000);
+            update_user_stats();
+            
+            window.setInterval(function() {
+                if(auto_update) {
+                    show_past_hours(1);
+                }
+            }, UPDATE_INTERVAL)
+            
+            $("#resolution").on("change", function() {
+                resolution = $("#resolution").val();
+                show_past_hours(past_hrs);
+            })
+        })
+        
+        function update_user_stats() {
+            $.get("stats/userdata", function(data) {
+                $("#uniqueusers").text(data.stats.unique_users)
+                $("#avgduration").text(data.stats.avg_duration.toFixed(2))
+                $("#avgsessions").text(data.stats.avg_sessions.toFixed(2))
+                
+                hours_running = (new Date() - new Date("2016-03-10T23:32:40")) / 60 / 60 / 1000
+                
+                $("#acquisitionrate").text((data.stats.unique_users / hours_running).toFixed(2))
+            })
+        }
+        
+        function show_past_week() {
+            show_past_hours(24*7)        
+        }
+        
+        function show_past_month() {
+            show_past_hours(24*30)        
+        }
+
+        function show_past_hours(n) {
+            show_hours_ago(0, n)
+            past_hrs = n;
+        }        
+        
+        function show_hours_ago(a, b) {
+            var now = new Date();
+            var end = new Date(now.getTime() - 1000*60*60 * a); // a hours ago
+            var start = new Date(now.getTime() - 1000*60*60 * b); // b hours ago
+            chart_range(start.toISOString(), end.toISOString(), resolution);          
+        }                
+        
+        function chart_range(start, end, samples) {
+            d3.selectAll("svg").remove();
+            $.get("stats/data/" + start + "/" + end + "/" + samples, function(data) {
+                
+                create_chart(data.client_stats, ["active_users", "avg_wait"], "Active Users / Wait Time"); 
+                //create_chart(data.client_stats, ["avg_wait"], "Average Wait Time");       
+                create_chart(data.worker_stats, ["active_workers", "ready_workers", "request_queue_length"], "Active/Ready Workers/Queue Length");       
+                //create_chart(data.worker_stats, ["request_queue_length"], "Workers Queue Length");       
+                create_chart(data.client_stats, ["request_rate", "drop_rate"], "Request/Drop Rate");
+            });
+        }
+        
+        default_colors = ["#FFFFFF", "#00FF00", "#0000FF", "#FF0000", "#FFFF00", "#FF00FF", "#00FFFF"];
+        function create_chart(data, plot_names, title, colors) {
+            colors = typeof colors !== 'undefined' ? colors : default_colors;
+            var vis = d3.select("body")
+                        .append("svg:svg")
+                        .attr("width", chart_width)
+                        .attr("height", chart_height);
+                     
+            var g = vis.append("svg:g");
+                        //.attr("transform", "translate(0, 200)");
+                        
+            var plots = {};
+            plot_names.reverse()
+            
+            $.each(plot_names, function(idx, name) {
+                plots[name] = {};
+            })
+
+            x_scale = d3.time.scale().range([0 + chart_margin, chart_width - chart_margin])
+                                     .domain(d3.extent(data, function(d) { return Date.parse(d["timestamp"]); }));
+                                     
+            
+            var i = 0;
+            $.each(plots, function(name, plot) {
+                plot["max_y"] = d3.max(data, function(d) { return d[name]})
+                plot["y_scale"] = d3.scale.linear().domain([0, plot["max_y"]])
+                                 .range([chart_height - chart_margin, 0 + chart_margin]);
+                plot["line"] = d3.svg.line()
+                                    .x(function(d,i) { return x_scale(Date.parse(d["timestamp"])); })
+                                    .y(function(d) { return plot["y_scale"](d[name])})
+                                    .interpolate("monotone");
+                                    
+                g.append("svg:path").attr("d", plot["line"](data))
+                 .style("stroke", colors[(plot_names.length-i-1)%colors.length]);
+                i++;
+            })
+            
+            plot_names.reverse()
+            
+            console.log(plots);
+            
+            var xAxis = d3.svg.axis().scale(x_scale);
+            var yAxis = d3.svg.axis().scale(plots[plot_names[0]]["y_scale"]).orient("left");
+            
+            vis.append("svg:g").attr("class", "x axis")
+                .attr("transform", "translate(0," + (chart_height - chart_margin) + ")")
+                .call(xAxis);
+            
+            vis.append("svg:g").attr("class", "y axis")
+                .attr("transform", "translate(" + chart_margin + ", 0)")
+                .call(yAxis);
+                
+            // Add a title
+            vis.append("text")
+                .attr("class", "title")
+                .attr("x", chart_width / 2)
+                .attr("y", chart_margin * 0.75)
+                .attr("text-anchor", "middle")
+                .text(title);
+            
+        }
+    </script>
+</head>
+<body>
+    <div id="options">
+        <span class="button" id="show1hr">Past Hour</span>
+        <span class="button" id="show8hrs">Past 8hrs</span>
+        <span class="button" id="show24">Past 24hrs</span>
+        <span class="button" id="show3days">Past 3 days</span>
+        <span class="button" id="showWeek">Past Week</span>
+        <br>
+        Resolution: <input type="number" class="button" id="resolution" value="200" /> samples
+<!--         <span class="button" id="showMonth">Past Month</span> -->
+    </div>
+    
+    <div id="userstats">
+        Total Unique Users: <span class="number" id="uniqueusers">-</span>
+        <br>
+        User acquisition: <span class="number" id="acquisitionrate">-</span> users/hr
+        <br>
+        Average Scrying Time: <span class="number" id="avgduration">-</span> min
+        <br>
+        Average Scrying Sessions: <span class="number" id="avgsessions">-</span>
+    </div>
+    
+</body>
