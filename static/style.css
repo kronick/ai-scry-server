@@ -1,0 +1,191 @@
+body, html {
+        overflow-x: hidden;
+        background: #00a9ff;
+background: -moz-linear-gradient(45deg,  #00a9ff 0%, #ea00a8 100%);
+background: -webkit-linear-gradient(45deg,  #00a9ff 0%,#ea00a8 100%);
+background: linear-gradient(45deg,  #00a9ff 0%,#ea00a8 100%);
+filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#00a9ff', endColorstr='#ea00a8',GradientType=1 );
+        color: white;
+        font-family: HelveticaNeue-Light, Helvetica, Arial;
+        width: 100%;
+        margin: 0;
+}
+#logo {
+        width: 3em;
+        position: absolute;
+        top: 0;
+        left: 0;
+        font-size: inherit;
+}
+#logo-box #crystalball {
+        width: 1.2em;
+        position: absolute;
+        top: 0;
+        left: 0.9em;
+        font-size: inherit;
+}
+#logo-box {
+        position: relative;
+        display: block;
+        font-size: 150px;
+        height: 1.5em;
+        width: 3em;
+        margin-left: auto;
+        margin-right: auto;
+}
+
+#byline {
+        position: absolute;
+        font-size: 0.2em;
+        left: 10em;
+        top: 5em;
+}
+#byline a {
+        background: none;
+}
+
+#video {
+        position: fixed;
+        right: 2em;
+        width: 50%;
+        height: 50%;
+        top: 25%;
+
+}
+
+#description {
+        width: 40%;
+        font-weight: lighter;
+        text-align: center;
+        margin-left: 1em;
+        margin-top: 1em;
+        background-color: rgba(0,0,0,0.2);
+        padding: 1em;
+        font-size: 18pt;
+        font-weight: lighter;
+}
+ .tagline {
+        font-style: italic;
+        text-align: center;
+        font-size: 1.3em;
+        margin-bottom: 1em;
+} 
+ a {
+        background-color: yellow;
+        padding: 0em;
+        padding-left: 0.25em;
+        padding-right: 0.25em;
+        text-decoration: none;
+        font-style: italic;
+        color: blue;
+}
+ 
+ .section {
+        text-align: left;
+        font-style: italic;
+        font-weight: bolder;
+        margin-bottom: 0em;
+} 
+ .howitworks {
+        font-size: .72em;
+        text-align: left;
+}
+ .howitworks a {
+        font-size: .72em;
+        color: blue;
+        font-weight: bold;
+}
+ .define, .define a {
+        font-size: .72em;
+        font-style: italic;
+        text-align: left;
+} 
+
+.define a {
+        color: blue;
+        font-weight: bold;
+}
+
+#description p {
+        text-align: left;
+}
+#diagram {
+        width: 60%;
+        margin-left: auto;
+        margin-right: auto;
+        border: 1px dotted white;
+        margin-top: 1em;
+}
+
+a.imglink {
+        background: none;
+}
+a.imglink img {
+        width: 40%;
+}
+.realemoji {
+        font-weight: normal;
+        font-style: normal;
+}
+
+#video2 {
+        display: none;
+}
+
+@media all and (max-width: 1000px) {
+        body, html {
+                font-size: 0.5em;
+        }
+        #description {
+                width: 80%;
+                margin: auto;
+                position: relative;
+                font-size: 16pt;
+        }
+        .tagline {
+                font-size: 1.2em;
+        }
+        #video {
+                display: none;
+                position: relative;
+                margin-left: auto;
+                margin-right: auto;
+                margin-top: 2em;
+                margin-bottom: 2em;
+                width: 80%;     
+                right: auto;             
+                top: auto;
+                height: auto;
+        }
+
+        #video2 {
+                display: block;
+                margin-bottom: 1em;
+        }
+}
+
+@media all and (max-width: 500px) {        
+        #logo-box {
+                font-size: 100px;
+        }
+        a.imglink img {
+            width: 60%;
+        }
+        #diagram {
+            width: 80%;
+        }
+        .tagline {
+                font-size: 1em;
+        }
+}
+
+
+@media all and (max-width: 320px) {
+        #logo-box {
+                font-size: 80px;
+        }
+        #description {
+                font-size: 14pt;
+        }
+
+}
