@@ -104,6 +104,20 @@ protos.expander = nn.FeatExpander(opt.seq_per_img)
 protos.lm:createClones() -- reconstruct clones inside the language model
 if opt.gpuid >= 0 then for k,v in pairs(protos) do v:cuda() end end
 
+
+-------------------------------------------------------------------------------
+-- Get the public hostname of this instance for identification
+-------------------------------------------------------------------------------
+c = assert(curl.new())
+local hostname = ""
+assert(c:setopt(curl.OPT_URL, "http://169.254.169.254/latest/meta-data/public-hostname"))
+assert(c:setopt(curl.OPT_WRITEDATA, output))
+assert(c:setopt(curl.OPT_WRITEFUNCTION,function(stream, buffer)
+                hostname = buffer
+                return string.len(buffer);
+        end));
+assert(c:perform())
+
 -------------------------------------------------------------------------------
 -- Initialize ZeroMQ to receive filenames as messages
 -------------------------------------------------------------------------------
@@ -123,7 +137,9 @@ function s_worker_socket(ctx)
   
   zassert(worker, err)
   print("Worker online!")
-  worker:send(PPP_READY)
+  print("Hostname is: " .. hostname)
+  print("Identity is: " .. identity)
+  worker:send_all({PPP_READY, hostname})
   return worker;
 end
 
@@ -261,7 +277,7 @@ local function run()
         -- Send heartbeat to queue if it's time
         if not worker then return end
         printf ("I: worker heartbeat\n");
-        worker:send(PPP_HEARTBEAT)
+        worker:send_all({PPP_HEARTBEAT, hostname})
     end)
     
     loop:start()

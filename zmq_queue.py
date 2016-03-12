@@ -9,6 +9,12 @@ from datetime import datetime
 
 from collections import deque
 
+config = {
+    "LOGGING_SERVER_ADDR": "tcp://localhost:5500",
+    "LOG_INTERVAL": 1,  # Log stats every 1 seconds
+}
+last_log_timestamp = time.time()
+
 HEARTBEAT_LIVENESS = 10     # 3..5 is reasonable
 HEARTBEAT_INTERVAL = 1.0   # Seconds
 
@@ -19,8 +25,9 @@ PPP_HEARTBEAT = "\x02"  # Signals worker heartbeat
 alive_workers = {}
 
 class Worker(object):
-    def __init__(self, address):
+    def __init__(self, address, hostname="???"):
         self.address = address
+        self.hostname = hostname
         self.expiry = time.time() + HEARTBEAT_INTERVAL * HEARTBEAT_LIVENESS
 
 class WorkerQueue(object):
@@ -64,12 +71,14 @@ context = zmq.Context(1)
 
 frontend = context.socket(zmq.ROUTER) # ROUTER
 backend = context.socket(zmq.ROUTER)  # ROUTER
+info_sock = context.socket(zmq.REP)
+
 socket_set_hwm(frontend, 5)
 socket_set_hwm(backend, 5)
 
 frontend.bind("tcp://*:5559") # For clients
 backend.bind("tcp://*:5560")  # For workers
-
+info_sock.bind("tcp://*:5411") # for debugging internal state info
 
 poll_workers = zmq.Poller()
 poll_workers.register(backend, zmq.POLLIN)
@@ -77,6 +86,7 @@ poll_workers.register(backend, zmq.POLLIN)
 poll_both = zmq.Poller()
 poll_both.register(frontend, zmq.POLLIN)
 poll_both.register(backend, zmq.POLLIN)
+poll_both.register(info_sock, zmq.POLLIN)
 
 workers = WorkerQueue()
 
@@ -85,18 +95,52 @@ heartbeat_at = time.time() + HEARTBEAT_INTERVAL
 queue_length = {}
 requests = deque()
 
+def log_stats():
+    global last_log_timestamp
+    dT = time.time() - last_log_timestamp
+    if dT < config["LOG_INTERVAL"]:
+        return
+    
+    last_log_timestamp = time.time()
+    
+    logger = context.socket(zmq.REQ)
+    logger.connect(config["LOGGING_SERVER_ADDR"]) # For logging system
+    zmq_poll = zmq.Poller()
+    zmq_poll.register(logger, zmq.POLLIN)
+    
+    message = ["WORKER_STATS", "{}".format(len(alive_workers)),  "{}".format(len(workers.queue)), "{}".format(len(requests))]
+    logger.send_multipart(message)
+
+    try:
+        socks = dict(zmq_poll.poll(100))
+        if socks.get(logger) == zmq.POLLIN:
+            response = logger.recv()
+            if not response:
+                return False
+            else:
+                return True
+        else:
+            return False
+    except Exception as z:
+        print str(z)
+        return False
+
 print "[{}] Entering main run loop...".format(datetime.now())
 while True:
-    #if len(workers.queue) > 0:
-    #    poller = poll_both
-    #else:
-    #    poller = poll_workers
     poller = poll_both
     
-    #socks = dict(poller.poll(HEARTBEAT_INTERVAL * 1000))
     socks = dict(poller.poll(100))
+    
+    # Handle requests for info
+    if socks.get(info_sock) == zmq.POLLIN:
+        frames = info_sock.recv_multipart()
 
-    #print "[{}] Polling...".format(datetime.now())
+        info = ""
+        for w in alive_workers:
+            info += "{}: {}, ".format(w, alive_workers[w].hostname)
+        
+        info_sock.send(info)
+
     # Handle worker activity on backend
     if socks.get(backend) == zmq.POLLIN:
         # Use worker address for LRU routing
@@ -106,11 +150,6 @@ while True:
 
         address = frames[0]
         msg = frames[1:]
-        
-#         if (msg[0] == PPP_READY and len(msg) == 1) or len(msg) > 1:
-#             # Only say this worker is ready if it's a relevant message
-#             workers.ready(Worker(address))
-
            
         # Validate control message, or return reply to client
         if len(msg) == 1:
@@ -120,12 +159,21 @@ while True:
                 print "[{}] Worker {} is now online!".format(datetime.now(), address)
                 workers.ready(Worker(address))
             elif msg[0] == PPP_HEARTBEAT:
-                print "[{}] Worker {} heartbeat".format(datetime.now(), address)
+                #print "[{}] Worker {} heartbeat".format(datetime.now(), address)
                 if not alive_workers.has_key(address):
                     workers.ready(Worker(address))
                 else:
                     workers.keepalive(address)
-            
+        elif msg[0] == PPP_READY:
+            hostname = msg[1]
+            print "[{}] Worker {} is now online! (Host: {})".format(datetime.now(), address, hostname)
+            workers.read(Worker(address, hostname))
+        elif msg[0] == PPP_HEARTBEAT:
+            hostname = msg[1]
+            if not alive_workers.has_key(address):
+                workers.ready(Worker(address, hostname))
+            else:
+                workers.keepalive(address)
 
         else:
             print "[{}] Received response from worker ID {}".format(datetime.now(), address)
@@ -144,6 +192,7 @@ while True:
                 msg = [worker, PPP_HEARTBEAT]
                 backend.send_multipart(msg)
             heartbeat_at = time.time() + HEARTBEAT_INTERVAL
+
     # Handle client request on the frontend
     if socks.get(frontend) == zmq.POLLIN:
         frames = frontend.recv_multipart()
@@ -162,6 +211,7 @@ while True:
     
     if(len(requests) > 0):
         print "[{}] Processing queue... {} workers available".format(datetime.now(), len(workers.queue))
+
     while len(workers.queue) > 0 and len(requests) > 0:
         frames = requests.popleft()
         
@@ -177,5 +227,5 @@ while True:
             break
 
     workers.purge()
-    
+    log_stats()
     sys.stdout.flush()
