@@ -4,6 +4,7 @@ from collections import OrderedDict
 import time
 import sys
 import zmq
+import json
 from zhelpers import socket_set_hwm
 from datetime import datetime
 
@@ -135,11 +136,15 @@ while True:
     if socks.get(info_sock) == zmq.POLLIN:
         frames = info_sock.recv_multipart()
 
-        info = ""
-        for w in alive_workers:
-            info += "{}: {}, ".format(w, alive_workers[w].hostname)
+
+        def get_char(w):        
+            id = bytearray(w)
+            return chr(id[len(id)-1])
+            
+        list_workers = [{"id": get_char(w), "host": alive_workers[w].hostname} for w in alive_workers]
+
         
-        info_sock.send(info)
+        info_sock.send(json.dumps(list_workers, sort_keys=True, indent=4, separators=(',', ': ')))
 
     # Handle worker activity on backend
     if socks.get(backend) == zmq.POLLIN:
@@ -167,7 +172,7 @@ while True:
         elif msg[0] == PPP_READY:
             hostname = msg[1]
             print "[{}] Worker {} is now online! (Host: {})".format(datetime.now(), address, hostname)
-            workers.read(Worker(address, hostname))
+            workers.ready(Worker(address, hostname))
         elif msg[0] == PPP_HEARTBEAT:
             hostname = msg[1]
             if not alive_workers.has_key(address):

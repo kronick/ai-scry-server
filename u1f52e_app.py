@@ -320,7 +320,7 @@ def send_message_to_logger(t, message):
 
 
 
-app.debug = True    
+app.debug = False    
 if __name__ == '__main__':
     
     app.run()

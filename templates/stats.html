@@ -87,6 +87,8 @@
             $("#show3days").click(function() { auto_update = false;show_past_hours(24*3); })
             $("#showWeek").click(function() { auto_update = false;show_past_week(); })
             $("#showMonth").click(function() { auto_update = false;show_past_month(); })
+            $("#show3months").click(function() { auto_update = false;show_past_hours(24*30*3); })
+
             
             window.setInterval(update_user_stats, 5000);
             update_user_stats();
@@ -98,7 +100,7 @@
             }, UPDATE_INTERVAL)
             
             $("#resolution").on("change", function() {
-                resolution = $("#resolution").val();
+                resolution = $("#resolution").val();    
                 show_past_hours(past_hrs);
             })
         })
@@ -217,6 +219,8 @@
         <span class="button" id="show24">Past 24hrs</span>
         <span class="button" id="show3days">Past 3 days</span>
         <span class="button" id="showWeek">Past Week</span>
+        <span class="button" id="showMonth">Past Month</span>
+        <span class="button" id="show3months">Past 3 Months</span>
         <br>
         Resolution: <input type="number" class="button" id="resolution" value="200" /> samples
 <!--         <span class="button" id="showMonth">Past Month</span> -->
@@ -231,5 +235,4 @@
         <br>
         Average Scrying Sessions: <span class="number" id="avgsessions">-</span>
     </div>
-    
 </body>
